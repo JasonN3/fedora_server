@@ -5,3 +5,4 @@ RUN dnf install -y buildah git jq podman
 # Install docker
 RUN curl -L https://get.docker.com/ | sh
 
+RUN useradd -m -s /bin/bash runner
