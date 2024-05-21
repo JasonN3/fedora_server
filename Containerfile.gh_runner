@@ -4,5 +4,6 @@ RUN dnf install -y buildah git jq podman
 
 # Install docker
 RUN curl -L https://get.docker.com/ | sh
+RUN ln -s /usr/lib/systemd/system/docker.service /etc/systemd/system/multi-user.target.wants/docker.service
 
 RUN useradd -m -s /bin/bash runner
