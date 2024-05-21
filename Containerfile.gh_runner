@@ -1,0 +1,7 @@
+FROM ghcr.io/jasonn3/fedora_base
+
+RUN dnf install -y buildah git jq podman
+
+# Install docker
+RUN curl -L https://get.docker.com/ | sh
+
