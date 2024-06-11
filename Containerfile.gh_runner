@@ -1,4 +1,4 @@
-FROM ghcr.io/jasonn3/fedora_base
+FROM ghcr.io/jasonn3/fedora_base:main
 
 RUN dnf install -y buildah git jq podman
 
