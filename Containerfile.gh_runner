@@ -1,0 +1,13 @@
+FROM ghcr.io/jasonn3/fedora_base:main
+
+COPY rootfs.gh_runner/ /
+
+RUN dnf install -y buildah git jq podman
+
+# Install docker
+RUN dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+RUN ln -s /usr/lib/systemd/system/docker.service /etc/systemd/system/multi-user.target.wants/docker.service
+
+RUN useradd -m -s /bin/bash runner
+
+RUN dnf clean all
