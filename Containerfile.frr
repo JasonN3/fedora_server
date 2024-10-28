@@ -1,0 +1,9 @@
+FROM ghcr.io/jasonn3/fedora_base:main
+
+RUN dnf install -y frr podman haproxy && dnf clean all
+
+# Disable garbage
+RUN systemctl disable --now cockpit.service cockpit.socket
+RUN systemctl mask cockpit.service cockpit.socket
+
+COPY rootfs.frr/ /

@@ -1,0 +1,134 @@
+#!/usr/bin/env ansible-playbook
+
+---
+- name: Configure FRR
+  hosts: localhost
+  vars:
+    ansible_connection: local
+
+  tasks:
+  - name: "Get host info"
+    community.hashi_vault.vault_kv2_get:
+      path: immutable-os/routers/nodes/{{ ansible_fqdn }}
+      engine_mount_point: secrets
+    register: host_info
+    # host_info.secret
+
+  - name: Enable OSPF
+    when: host_info.secret.ospf is defined
+    block:
+      - name: "Get OSPF info"
+        community.hashi_vault.vault_kv2_get:
+          path: immutable-os/routers/{{ host_info.secret.ospf }}
+          engine_mount_point: secrets
+        register: ospf_info
+        # ospf_info.secret
+      
+      - name: Enable OSPF
+        ansible.builtin.lineinfile:
+          path: /etc/frr/daemons
+          regexp: '^ospfd='
+          line: ospfd=yes
+
+      - name: Get Interface list
+        ansible.builtin.set_fact:
+          network_interfaces: "{{ ansible_facts.interfaces | difference(['lo']) }}"
+
+      - name: Create backbone interface entry
+        ansible.builtin.blockinfile:
+          path: /etc/frr/frr.conf
+          marker: "# {mark} Interface {{ network_interfaces[0] }}"
+          append_newline: true
+          prepend_newline: true
+          block: |
+            interface {{ network_interfaces[0] }}
+              ip ospf area {{ ospf_info.secret.area }}
+              ip ospf authentication message-digest
+              ip ospf message-digest-key 1 md5 {{ ospf_info.secret.key }}
+            exit
+
+      - name: Create router ospf entry
+        ansible.builtin.blockinfile:
+          path: /etc/frr/frr.conf
+          marker: "# {mark} Router OSPF"
+          append_newline: true
+          prepend_newline: true
+          block: |
+            router ospf
+              redistribute connected
+            {% if host_info.secret.ospf_summary is defined %}
+            {% for range in (host_info.secret.ospf_summary | from_json ) %}
+              summary-address {{ range }}
+            {% endfor %}
+            {% endif %}
+            exit
+      
+
+  - name: Enable BGP
+    when: host_info.secret.bgp is defined
+    block:
+      - name: "Get BGP info"
+        community.hashi_vault.vault_kv2_get:
+          path: immutable-os/routers/{{ host_info.secret.bgp }}
+          engine_mount_point: secrets
+        register: bgp_info
+        # bgp_info.secret
+      
+      - name: Enable BGP
+        ansible.builtin.lineinfile:
+          path: /etc/frr/daemons
+          regexp: '^bgpd='
+          line: bgpd=yes
+
+      - name: Create loop interface
+        ansible.builtin.blockinfile:
+          path: /etc/frr/frr.conf
+          marker: "# {mark} Interface loopback0"
+          append_newline: true
+          prepend_newline: true
+          block: |
+            interface loopback0
+              ip address {{ host_info.secret.ibgp_address }} 255.255.255.255
+            {% if ospf_info is defined %}
+              ip ospf passive
+              ip ospf area {{ ospf_info.secret.area }}
+            {% endif %}
+            exit
+
+      - name: Create router bgp entry
+        ansible.builtin.blockinfile:
+          path: /etc/frr/frr.conf
+          marker: "# {mark} Router BGP"
+          append_newline: true
+          prepend_newline: true
+          block: |
+            router bgp {{ bgp_info.secret.as }}
+              bgp graceful-restart
+              neighbor peers peer-group
+              neighbor peers update-source loopback0
+              neighbor peers remote-as {{ bgp_info.secret.as }}
+            {% for node in bgp_info.secret.nodes | from_json %}
+            {% if node != ansible_fqdn %}
+            {% set node_ip=lookup('community.hashi_vault.vault_kv2_get', 'immutable-os/routers/nodes/' + 'jnet64-3.ad.jnethost.com', engine_mount_point='secrets').secret.ibgp_address %}
+              neighbor {{ node_ip }} description {{ node }}
+              neighbor {{ node_ip }} peer-group peers
+            {% endif %}
+            {% endfor %}
+              !
+              address-family ipv4 unicast
+            {% if host_info.secret.bgp_summary is defined %}
+            {% for range in host_info.secret.bgp_summary | from_json %}
+                aggregate-address {{ range }} summary-only
+            {% endfor %}
+            {% endif %}
+                redistribute connected
+              exit-address-family
+            exit
+
+  - name: Configure VRRP
+    block:
+      - name: Enable VRRP
+        ansible.builtin.lineinfile:
+          path: /etc/frr/daemons
+          regexp: '^vrrpd='
+          line: vrrpd=yes
