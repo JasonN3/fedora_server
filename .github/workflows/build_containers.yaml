@@ -61,23 +61,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.5.0
+#      - name: Install Cosign
+#        uses: sigstore/cosign-installer@v3.5.0
 
-      - name: Sign the images
-        if: github.ref_name == 'main'
-        env:
-          TAGS: ${{ steps.build-image.outputs.tags }}
-          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-        run: |
-          images=""
-          digest=""
-          for tag in ${TAGS}; do
-            if [[ -z "${digest}" ]]
-            then
-              digest=$(cat $(echo ${tag} | tr '/:' '--')_digest.txt)
-            fi
-            images+="${tag}@${digest} "
-          done
-          cosign sign --key env://COSIGN_PRIVATE_KEY --yes ${images}
+#      - name: Sign the images
+#        if: github.ref_name == 'main'
+#        env:
+#          TAGS: ${{ steps.build-image.outputs.tags }}
+#          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+#          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+#        run: |
+#          images=""
+#          digest=""
+#          for tag in ${TAGS}; do
+#            if [[ -z "${digest}" ]]
+#            then
+#              digest=$(cat $(echo ${tag} | tr '/:' '--')_digest.txt)
+#            fi
+#            images+="${tag}@${digest} "
+#          done
+#          cosign sign --key env://COSIGN_PRIVATE_KEY --yes ${images}
