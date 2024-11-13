@@ -1,0 +1,53 @@
+name: Build ISO
+
+on:
+  workflow_dispatch
+
+jobs:
+  build-iso:
+    name: Build ISO Installer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
+          tool-cache: false
+          
+          # all of these default to true, but feel free to set to
+          # "false" if necessary for your workflow
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build ISO
+        id: build
+        uses: JasonN3/build-container-installer@main
+        with:
+          flatpak_remote_refs_dir: flatpak_refs
+          image_name: fedora_workstation
+          image_repo: ghcr.io/jasonn3
+          image_tag: ${{ github.ref_name }}
+          version: 40
+          variant: Workstation
+
+      - name: Move to save location
+        run:
+          mv ${{ steps.build.outputs.iso_path }} /save/
